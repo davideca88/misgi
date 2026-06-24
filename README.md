@@ -12,20 +12,32 @@ USAGE:
 Analyze a binary and detect obfuscated malware using subgraph isomorphism.
 
 ARGUMENTS:
-    <binary> Path to the binary file to analyze
+    <exec-binary>                 Path to the binary file to analyze
 
 OPTIONS:
-
-    -m, --malware-binary <FILE>
-
-    -e, --export-graphs     Export generated graphs
-
-    -f, --export-format <FORMAT>    Graph export format (dot, json, gml, ...)
-        Requires --export-graphs
-
-    -h, --help  Display this help message and exit
-
+    -m, --malware <FILE>          Malware binary to search for
+    -e, --export-graphs           Export generated graphs
+    -i, --import-graphs           Import graphs from dot instead of RE binaries
+    -f, --export-format <FORMAT>  Graph export format (dot, json, gml)
+                                  Requires --export-graphs
+    -M, --mock <PP> <AR> <SEED>   Run detection against a mocked target
+                                  Values must be passed in this exact order:
+                                  perturbation percentage, add ratio, RNG seed
+    -h, --help                    Display this help message and exit
 ```
+
+
+### Mock mode
+
+Use `-M, --mock <PP> <AR> <SEED>` to run detection against a mocked target graph. In this mode, MISGI first performs the normal graph reductions and fallback, then injects the malware pattern into the target graph and runs the final subgraph matching against that mocked target.
+
+The three values are positional and must be passed in this exact order:
+
+- `PP`: perturbation percentage in `[0.0, 1.0]`.
+- `AR`: fraction of the perturbation budget spent on edge additions, also in `[0.0, 1.0]`.
+- `SEED`: non-negative RNG seed for reproducible mock generation.
+
+When combined with `--export-graphs`, mock mode exports `target_graph.<ext>` for the original target, `target_mock_graph.<ext>` for the mocked target, and `malware_graph.<ext>` for the final malware pattern. The output also includes the perturbation edge counts currently reported by the mock processor.
 
 ## Installation
 

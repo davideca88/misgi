@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use misgi::cli::{parse_args, CliArgs, CliError, CliParseResult};
+use misgi::cli::{parse_args, CliArgs, CliError, CliParseResult, MockArgs};
 use misgi::graph_export::GraphExportFormat;
 
 fn args(values: &[&str]) -> Vec<OsString> {
@@ -14,6 +14,7 @@ fn expected_run() -> CliParseResult {
         malware_binary: PathBuf::from("malware.bin"),
         export_graphs: false,
         export_format: None,
+        mock: None,
     })
 }
 
@@ -26,6 +27,14 @@ fn parses_short_malware_option() {
 
 #[test]
 fn parses_long_malware_option() {
+    let parsed =
+        parse_args(args(&["target.bin", "--malware", "malware.bin"])).expect("args should parse");
+
+    assert_eq!(parsed, expected_run());
+}
+
+#[test]
+fn parses_legacy_long_malware_option() {
     let parsed = parse_args(args(&["target.bin", "--malware-binary", "malware.bin"]))
         .expect("args should parse");
 
@@ -49,6 +58,7 @@ fn parses_export_graphs() {
             malware_binary: PathBuf::from("malware.bin"),
             export_graphs: true,
             export_format: None,
+            mock: None,
         })
     );
 }
@@ -77,9 +87,104 @@ fn parses_supported_export_formats() {
                 malware_binary: PathBuf::from("malware.bin"),
                 export_graphs: true,
                 export_format: Some(format),
+                mock: None,
             })
         );
     }
+}
+
+#[test]
+fn parses_mock_option() {
+    let parsed = parse_args(args(&[
+        "target.bin",
+        "-m",
+        "malware.bin",
+        "--mock",
+        "0.25",
+        "0.75",
+        "123",
+    ]))
+    .expect("args should parse");
+
+    assert_eq!(
+        parsed,
+        CliParseResult::Run(CliArgs {
+            target_binary: PathBuf::from("target.bin"),
+            malware_binary: PathBuf::from("malware.bin"),
+            export_graphs: false,
+            export_format: None,
+            mock: Some(MockArgs {
+                perturbation_percentage: 0.25,
+                add_ratio: 0.75,
+                seed: 123,
+            }),
+        })
+    );
+}
+
+#[test]
+fn missing_mock_values_fail() {
+    assert_eq!(
+        parse_args(args(&["target.bin", "-m", "malware.bin", "--mock"])),
+        Err(CliError::MissingMockPerturbationPercentage)
+    );
+    assert_eq!(
+        parse_args(args(&["target.bin", "-m", "malware.bin", "--mock", "0.2"])),
+        Err(CliError::MissingMockAddRatio)
+    );
+    assert_eq!(
+        parse_args(args(&[
+            "target.bin",
+            "-m",
+            "malware.bin",
+            "--mock",
+            "0.2",
+            "0.5",
+        ])),
+        Err(CliError::MissingMockSeed)
+    );
+}
+
+#[test]
+fn invalid_mock_values_fail() {
+    assert_eq!(
+        parse_args(args(&[
+            "target.bin",
+            "-m",
+            "malware.bin",
+            "--mock",
+            "1.2",
+            "0.5",
+            "1",
+        ])),
+        Err(CliError::InvalidMockPerturbationPercentage(OsString::from(
+            "1.2"
+        )))
+    );
+    assert_eq!(
+        parse_args(args(&[
+            "target.bin",
+            "-m",
+            "malware.bin",
+            "--mock",
+            "0.2",
+            "-0.1",
+            "1",
+        ])),
+        Err(CliError::InvalidMockAddRatio(OsString::from("-0.1")))
+    );
+    assert_eq!(
+        parse_args(args(&[
+            "target.bin",
+            "-m",
+            "malware.bin",
+            "--mock",
+            "0.2",
+            "0.5",
+            "seed",
+        ])),
+        Err(CliError::InvalidMockSeed(OsString::from("seed")))
+    );
 }
 
 #[test]

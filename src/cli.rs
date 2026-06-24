@@ -3,15 +3,23 @@ use std::path::PathBuf;
 
 use crate::graph_export::GraphExportFormat;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CliArgs {
     pub target_binary: PathBuf,
     pub malware_binary: PathBuf,
     pub export_graphs: bool,
     pub export_format: Option<GraphExportFormat>,
+    pub mock: Option<MockArgs>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MockArgs {
+    pub perturbation_percentage: f64,
+    pub add_ratio: f64,
+    pub seed: u64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum CliParseResult {
     Run(CliArgs),
     Help,
@@ -23,6 +31,12 @@ pub enum CliError {
     MissingMalwareBinary,
     MissingMalwareBinaryValue,
     MissingExportFormatValue,
+    MissingMockPerturbationPercentage,
+    MissingMockAddRatio,
+    MissingMockSeed,
+    InvalidMockPerturbationPercentage(OsString),
+    InvalidMockAddRatio(OsString),
+    InvalidMockSeed(OsString),
     ExportFormatWithoutExportGraphs,
     UnsupportedExportFormat(OsString),
     UnexpectedArgument(OsString),
@@ -37,6 +51,23 @@ impl CliError {
                 "missing value for malware binary option".to_string()
             }
             Self::MissingExportFormatValue => "missing value for export format option".to_string(),
+            Self::MissingMockPerturbationPercentage => {
+                "missing perturbation percentage for mock option".to_string()
+            }
+            Self::MissingMockAddRatio => "missing add ratio for mock option".to_string(),
+            Self::MissingMockSeed => "missing seed for mock option".to_string(),
+            Self::InvalidMockPerturbationPercentage(value) => format!(
+                "invalid mock perturbation percentage: {}; expected a number in [0.0, 1.0]",
+                value.to_string_lossy()
+            ),
+            Self::InvalidMockAddRatio(value) => format!(
+                "invalid mock add ratio: {}; expected a number in [0.0, 1.0]",
+                value.to_string_lossy()
+            ),
+            Self::InvalidMockSeed(value) => format!(
+                "invalid mock seed: {}; expected a non-negative integer",
+                value.to_string_lossy()
+            ),
             Self::ExportFormatWithoutExportGraphs => {
                 "export format requires --export-graphs".to_string()
             }
@@ -62,10 +93,14 @@ ARGUMENTS:
     <exec-binary>                 Path to the binary file to analyze
 
 OPTIONS:
-    -m, --malware-binary <FILE>   Malware binary to search for
+    -m, --malware <FILE>          Malware binary to search for
     -e, --export-graphs           Export generated graphs
+    -i, --import-graphs           Import graphs from dot instead of RE binaries
     -f, --export-format <FORMAT>  Graph export format (dot, json, gml)
                                   Requires --export-graphs
+    -M, --mock <PP> <AR> <SEED>   Run detection against a mocked target
+                                  Values must be passed in this exact order:
+                                  perturbation percentage, add ratio, RNG seed
     -h, --help                    Display this help message and exit
 ";
 
@@ -77,6 +112,7 @@ where
     let mut malware_binary = None;
     let mut export_graphs = false;
     let mut export_format = None;
+    let mut mock_args = None;
     let mut iter = args.into_iter();
 
     while let Some(argument) = iter.next() {
@@ -84,7 +120,7 @@ where
             return Ok(CliParseResult::Help);
         }
 
-        if argument == "-m" || argument == "--malware-binary" {
+        if argument == "-m" || argument == "--malware" || argument == "--malware-binary" {
             let value = iter.next().ok_or(CliError::MissingMalwareBinaryValue)?;
             malware_binary = Some(PathBuf::from(value));
             continue;
@@ -100,6 +136,27 @@ where
             let format = GraphExportFormat::parse(&value)
                 .ok_or_else(|| CliError::UnsupportedExportFormat(value.clone()))?;
             export_format = Some(format);
+            continue;
+        }
+
+        if argument == "-M" || argument == "--mock" {
+            let perturbation_percentage = iter
+                .next()
+                .ok_or(CliError::MissingMockPerturbationPercentage)?;
+            let add_ratio = iter.next().ok_or(CliError::MissingMockAddRatio)?;
+            let seed = iter.next().ok_or(CliError::MissingMockSeed)?;
+
+            mock_args = Some(MockArgs {
+                perturbation_percentage: parse_unit_interval(
+                    &perturbation_percentage,
+                    CliError::InvalidMockPerturbationPercentage,
+                )?,
+                add_ratio: parse_unit_interval(&add_ratio, CliError::InvalidMockAddRatio)?,
+                seed: seed
+                    .to_string_lossy()
+                    .parse::<u64>()
+                    .map_err(|_| CliError::InvalidMockSeed(seed.clone()))?,
+            });
             continue;
         }
 
@@ -126,5 +183,19 @@ where
         malware_binary,
         export_graphs,
         export_format,
+        mock: mock_args,
     }))
+}
+
+fn parse_unit_interval(value: &OsString, error: fn(OsString) -> CliError) -> Result<f64, CliError> {
+    let parsed = value
+        .to_string_lossy()
+        .parse::<f64>()
+        .map_err(|_| error(value.clone()))?;
+
+    if (0.0..=1.0).contains(&parsed) {
+        Ok(parsed)
+    } else {
+        Err(error(value.clone()))
+    }
 }
