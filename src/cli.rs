@@ -15,6 +15,7 @@ pub struct CliArgs {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MockArgs {
     pub perturbation_percentage: f64,
+    pub injection_ratio: f64,
     pub add_ratio: f64,
     pub seed: u64,
 }
@@ -32,9 +33,11 @@ pub enum CliError {
     MissingMalwareBinaryValue,
     MissingExportFormatValue,
     MissingMockPerturbationPercentage,
+    MissingMockInjectionRatio,
     MissingMockAddRatio,
     MissingMockSeed,
     InvalidMockPerturbationPercentage(OsString),
+    InvalidMockInjectionRatio(OsString),
     InvalidMockAddRatio(OsString),
     InvalidMockSeed(OsString),
     ExportFormatWithoutExportGraphs,
@@ -54,10 +57,15 @@ impl CliError {
             Self::MissingMockPerturbationPercentage => {
                 "missing perturbation percentage for mock option".to_string()
             }
+            Self::MissingMockInjectionRatio => "missing injection ratio for mock option".to_string(),
             Self::MissingMockAddRatio => "missing add ratio for mock option".to_string(),
             Self::MissingMockSeed => "missing seed for mock option".to_string(),
             Self::InvalidMockPerturbationPercentage(value) => format!(
                 "invalid mock perturbation percentage: {}; expected a number in [0.0, 1.0]",
+                value.to_string_lossy()
+            ),
+            Self::InvalidMockInjectionRatio(value) => format!(
+                "invalid mock injection ratio: {}; expected a non-negative number",
                 value.to_string_lossy()
             ),
             Self::InvalidMockAddRatio(value) => format!(
@@ -93,15 +101,15 @@ ARGUMENTS:
     <exec-binary>                 Path to the binary file to analyze
 
 OPTIONS:
-    -m, --malware <FILE>          Malware binary to search for
-    -e, --export-graphs           Export generated graphs
-    -i, --import-graphs           Import graphs from dot instead of RE binaries
-    -f, --export-format <FORMAT>  Graph export format (dot, json, gml)
-                                  Requires --export-graphs
-    -M, --mock <PP> <AR> <SEED>   Run detection against a mocked target
-                                  Values must be passed in this exact order:
-                                  perturbation percentage, add ratio, RNG seed
-    -h, --help                    Display this help message and exit
+    -m, --malware <FILE>               Malware binary to search for
+    -e, --export-graphs                Export generated graphs
+    -i, --import-graphs                Import graphs from dot instead of RE binaries
+    -f, --export-format <FORMAT>       Graph export format (dot, json, gml)
+                                       Requires --export-graphs
+    -M, --mock <PP> <IR> <AR> <SEED>   Run detection against a mocked target
+                                       Values must be passed in this exact order:
+                                       perturbation percentage, add ratio, RNG seed
+    -h, --help                         Display this help message and exit
 ";
 
 pub fn parse_args<I>(args: I) -> Result<CliParseResult, CliError>
@@ -143,6 +151,7 @@ where
             let perturbation_percentage = iter
                 .next()
                 .ok_or(CliError::MissingMockPerturbationPercentage)?;
+                let injection_ratio = iter.next().ok_or(CliError::MissingMockPerturbationPercentage)?;
             let add_ratio = iter.next().ok_or(CliError::MissingMockAddRatio)?;
             let seed = iter.next().ok_or(CliError::MissingMockSeed)?;
 
@@ -151,6 +160,7 @@ where
                     &perturbation_percentage,
                     CliError::InvalidMockPerturbationPercentage,
                 )?,
+                injection_ratio: parse_unit_interval(&injection_ratio, CliError::InvalidMockInjectionRatio)?,
                 add_ratio: parse_unit_interval(&add_ratio, CliError::InvalidMockAddRatio)?,
                 seed: seed
                     .to_string_lossy()

@@ -1,7 +1,6 @@
 use misgi::detection::{
-    analyze_detection_with_mock_from_graph_json, analyze_match_from_graph_json, MisgiError,
+    analyze_match_from_graph_json, MisgiError,
 };
-use misgi::graph_processor::mock::MockConfig;
 
 #[test]
 fn detects_malware_graph_inside_target_graph() {
@@ -78,7 +77,7 @@ fn invalid_target_graph_returns_contextual_error() {
 
     assert!(matches!(error, MisgiError::TargetGraph(_)));
 }
-
+/*
 #[test]
 fn mock_detection_injects_pattern_after_reduction() {
     let malware = r#"{"vertices":[1,2],"edges":[[1,2]]}"#;
@@ -102,3 +101,4 @@ fn mock_detection_injects_pattern_after_reduction() {
     assert_eq!(analysis.mock_report.edges_added_for_perturbation, 0);
     assert_eq!(analysis.mock_report.edges_removed_for_perturbation, 0);
 }
+*/

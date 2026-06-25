@@ -19,6 +19,7 @@ fn main() -> ExitCode {
             if let Some(mock_args) = args.mock {
                 let mock_config = MockConfig {
                     perturbation_percentage: mock_args.perturbation_percentage,
+                    injection_ratio: mock_args.injection_ratio,
                     add_ratio: mock_args.add_ratio,
                     seed: mock_args.seed,
                 };
@@ -177,11 +178,15 @@ fn print_report(report: &DetectionReport) {
 
 fn print_mock_report(report: &MockReport) {
     println!(
-        "mock perturbation edges added: {}",
-        report.edges_added_for_perturbation
+        "mock pattern edges added: {}",
+        report.pattern_edges_removed
     );
     println!(
-        "mock perturbation edges removed: {}",
-        report.edges_removed_for_perturbation
+        "mock pattern edges removed: {}",
+        report.pattern_edges_removed
     );
+    println!(
+        "mock injection edges added: {}",
+        report.injection_edges_added
+    )
 }
