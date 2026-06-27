@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-petgraph = "0.6"
+petgraph = { version = "0.8", features = ["dot_parser"] }
 serde = { version = "1", features = ["derive"] }
+dot-parser = "0.5.1"
 serde_json = "1"
 thiserror = "1"
 r2pipe = "0.8"

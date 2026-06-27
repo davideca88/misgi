@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use crate::graph_export::GraphExportFormat;
+use crate::import_graph::ImportGraphFormat;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CliArgs {
@@ -9,6 +10,8 @@ pub struct CliArgs {
     pub malware_binary: PathBuf,
     pub export_graphs: bool,
     pub export_format: Option<GraphExportFormat>,
+    pub import_graphs: bool,
+    pub import_format: Option<ImportGraphFormat>,
     pub mock: Option<MockArgs>,
 }
 
@@ -42,6 +45,9 @@ pub enum CliError {
     InvalidMockSeed(OsString),
     ExportFormatWithoutExportGraphs,
     UnsupportedExportFormat(OsString),
+    MissingImportFormatValue,
+    UnsupportedImportFormat(OsString),
+    ImportFormatWithoutImportGraphs,
     UnexpectedArgument(OsString),
 }
 
@@ -82,6 +88,15 @@ impl CliError {
             Self::UnsupportedExportFormat(format) => {
                 format!("unsupported export format: {}", format.to_string_lossy())
             }
+            Self::MissingImportFormatValue => {
+                "missing value for import format option".to_string()
+            }
+            Self::UnsupportedImportFormat(format) => {
+                format!("unsupported import format: {}", format.to_string_lossy())
+            }
+            Self::ImportFormatWithoutImportGraphs => {
+                "import format requires --import-graphs".to_string()
+            }
             Self::UnexpectedArgument(argument) => {
                 format!("unexpected argument: {}", argument.to_string_lossy())
             }
@@ -103,9 +118,12 @@ ARGUMENTS:
 OPTIONS:
     -m, --malware <FILE>               Malware binary to search for
     -e, --export-graphs                Export generated graphs
-    -i, --import-graphs                Import graphs from dot instead of RE binaries
+    -i, --import-graphs                Import graphs from JSON or DOT instead of RE binaries
     -f, --export-format <FORMAT>       Graph export format (dot, json, gml)
                                        Requires --export-graphs
+    -F, --import-format <FORMAT>       Import format fallback (json, dot), used only when
+                                         a graph file's extension is missing/unrecognized
+                                       Requires --import-graphs
     -M, --mock <PP> <IR> <AR> <SEED>   Run detection against a mocked target
                                          PP: perturbation percentage
                                          IR: injection ratio
@@ -122,6 +140,8 @@ where
     let mut malware_binary = None;
     let mut export_graphs = false;
     let mut export_format = None;
+    let mut import_graphs = false;
+    let mut import_format = None;
     let mut mock_args = None;
     let mut iter = args.into_iter();
 
@@ -146,6 +166,19 @@ where
             let format = GraphExportFormat::parse(&value)
                 .ok_or_else(|| CliError::UnsupportedExportFormat(value.clone()))?;
             export_format = Some(format);
+            continue;
+        }
+
+        if argument == "-i" || argument == "--import-graphs" {
+            import_graphs = true;
+            continue;
+        }
+
+        if argument == "-F" || argument == "--import-format" {
+            let value = iter.next().ok_or(CliError::MissingImportFormatValue)?;
+            let format = ImportGraphFormat::parse(&value)
+                .ok_or_else(|| CliError::UnsupportedImportFormat(value.clone()))?;
+            import_format = Some(format);
             continue;
         }
 
@@ -190,11 +223,17 @@ where
         return Err(CliError::ExportFormatWithoutExportGraphs);
     }
 
+    if import_format.is_some() && !import_graphs {
+        return Err(CliError::ImportFormatWithoutImportGraphs);
+    }
+
     Ok(CliParseResult::Run(CliArgs {
         target_binary,
         malware_binary,
         export_graphs,
         export_format,
+        import_graphs,
+        import_format,
         mock: mock_args,
     }))
 }
