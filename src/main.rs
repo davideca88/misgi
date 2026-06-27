@@ -179,7 +179,7 @@ fn print_report(report: &DetectionReport) {
 fn print_mock_report(report: &MockReport) {
     println!(
         "mock pattern edges added: {}",
-        report.pattern_edges_removed
+        report.pattern_edges_added
     );
     println!(
         "mock pattern edges removed: {}",

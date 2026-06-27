@@ -107,8 +107,10 @@ OPTIONS:
     -f, --export-format <FORMAT>       Graph export format (dot, json, gml)
                                        Requires --export-graphs
     -M, --mock <PP> <IR> <AR> <SEED>   Run detection against a mocked target
-                                       Values must be passed in this exact order:
-                                       perturbation percentage, add ratio, RNG seed
+                                         PP: perturbation percentage
+                                         IR: injection ratio
+                                         AR: add ratio
+                                         SEED: RNG seed
     -h, --help                         Display this help message and exit
 ";
 
